@@ -234,13 +234,15 @@ dependencies:
     - tensorboard==2.8.0
     - tensorboard-data-server==0.6.1
     - tensorboard-plugin-wit==1.8.1
-    - tensorflow==2.5.0
-    - tensorflow-estimator==2.5.0
+    - tensorflow==1.0.0
+    - tensorflow-estimator==2.10.0
+    - tensorflow-macos==2.10.0
     - termcolor==1.1.0
     - torch==1.12.1
     - torchvision==0.13.1
     - tqdm==4.64.1
     - typing-extensions==3.7.4.3
+    - unet==0.0.post0.dev81+gf557a51
     - urllib3==1.26.8
     - werkzeug==2.0.3
     - wrapt==1.12.1

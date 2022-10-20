@@ -7,6 +7,7 @@ from typing import Tuple, List
 from PIL import Image
 from numpy import asarray
 from skimage.transform import resize
+import random
 
 IMAGE_SIZE = (512, 512)
 channels = 1
@@ -20,23 +21,9 @@ MASK_DATASET_PATH = DATASET_PATH + "input/hubmap-organ-segmentation/binary_masks
 TRAIN_CSV = DATASET_PATH + "input/hubmap-organ-segmentation/train.csv"
 train_df = pd.read_csv(TRAIN_CSV)
 TOTAL_NUM_DATA = 351
-
-#for i in range(len(train_df['id'])):
-#    idx = random.randint(0, len(train_df) - 1)
-#    img_id = train_df['id'][idx]
-#    loadedimages = os.path.join(DATASET_PATH, f'train_images/{img_id}.tiff')
-#    loadedmasks = os.path.join(DATASET_PATH, f'binary_masks/{img_id}.png')
-'''
-img = Image.open(IMAGE_DATASET_PATH + '/62.tiff')
-numpydata1 = asarray(img)
-print(numpydata1)
-print(numpydata1.max())
-mask = Image.open(MASK_DATASET_PATH + '/62.png')
-numpydata = asarray(mask)
-print(numpydata)
-print(numpydata.max())
-'''
-
+OUTPUT_FOLDER = "/Users/jiehyun/kaggle/output/"
+IMG_NPY = OUTPUT_FOLDER + 'img_npy'
+MASK_NPY = OUTPUT_FOLDER + 'mask_npy'
 
 def load_data(count:int, splits:Tuple[float]=(0.71, 0.145, 0.145), **kwargs) -> List[tf.data.Dataset]:
     return [tf.data.Dataset.from_tensor_slices(_build_samples(int(split * count), **kwargs))
@@ -44,36 +31,27 @@ def load_data(count:int, splits:Tuple[float]=(0.71, 0.145, 0.145), **kwargs) -> 
 
 
 def _build_samples(sample_count:int, **kwargs) -> Tuple[np.array, np.array]:
-
-    # here we load the mitochondria data
-    #loaded = np.load('mito.npz')
-    #loadedimages = loaded['arr_0'][0].copy()
-    #loadedmasks = loaded['arr_0'][1].copy()
-    '''
+    
     for i in range(len(train_df['id'])):
         idx = random.randint(0, len(train_df) - 1)
         img_id = train_df['id'][idx]
-        loadedimages = os.path.join(DATASET_PATH, f'train_images/{img_id}.tiff')
-        loadedmasks = os.path.join(DATASET_PATH, f'binary_masks/{img_id}.png')
-    '''
-    output_shape = (512, 512)
+        loadedimages = np.load(IMG_NPY + f'/{img_id}.npy', allow_pickle=True).copy()
+        loadedmasks = np.load(MASK_NPY + f'/{img_id}.npy', allow_pickle=True).copy()
 
-    img = Image.open(IMAGE_DATASET_PATH + '/62.tiff')
-    img = img.resize(output_shape)
-    loadedimages = asarray(img)
+        output_shape = (512, 512)
+        loadedimages = resize(loadedimages, output_shape)
+        loadedmasks = resize(loadedmasks, output_shape)
     
-    mask = Image.open(MASK_DATASET_PATH + '/62.png')
-    mask = mask.resize(output_shape)
-    loadedmasks = asarray(mask)
-
     # now let's go to numpyland
     images = np.empty((sample_count, IMAGE_SIZE[0], IMAGE_SIZE[1], 1))
     labels = np.empty((sample_count, IMAGE_SIZE[0], IMAGE_SIZE[1], 2))
+    
     for i in range(sample_count):
-        image, mask = loadedimages[i], loadedmasks[i]
+        #image, mask = loadedimages[i], loadedmasks[i]
+        image, mask = loadedimages, loadedmasks
 
         image = image.reshape((IMAGE_SIZE[0], IMAGE_SIZE[1], 1)).astype(np.float)
-        mask = mask.reshape((IMAGE_SIZE[0], IMAGE_SIZE[1], 1))
+        mask = mask.reshape((IMAGE_SIZE[0], IMAGE_SIZE[1], 1)) #.astype(np.float)
 
         image = tf.cast(image, tf.float32)/255.0
         mask -= 1
