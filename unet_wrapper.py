@@ -1,58 +1,70 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import glob
 import os
-import sys
-from PIL import Image
-import random
-import pandas as pd
-import cv2
+from skimage import io
 
-
-DATASET_PATH = "/Users/jiehyun/kaggle/"
-TRAIN_CSV = DATASET_PATH + "input/hubmap-organ-segmentation/train.csv"
-train_df = pd.read_csv(TRAIN_CSV)
-#OUTPUT_FOLDER = "/Users/jiehyun/kaggle/output/"
-
+OUTPUT_IMG = "/Users/jiehyun/Jenna/UMassBoston/2022_Fall/CS696/01/output/test_img"
+OUTPUT_MSK = "/Users/jiehyun/Jenna/UMassBoston/2022_Fall/CS696/01/output/test_mask"
 
 class unet_wrapper:
-    def __init__(self, data_dir):
-        self.data_dir = data_dir
+    def __init__(self, image_dir, mask_dir):
+        self.image_dir = image_dir
+        self.mask_dir = mask_dir
     
     def convert_to_npy(self):
         #ref: https://gist.github.com/anilsathyan7/ffb35601483ac46bd72790fde55f5c04
-        dirs = os.listdir(self.data_dir)
-        dirs.sort()
+
+        #Convert image to npy
+        img_dirs = os.listdir(self.image_dir)
+        img_dirs.sort()
+        data_length = len(img_dirs)
         lists = []
-        for item in dirs:
-            if os.path.isfile(self.data_dir+item):
-                im = Image.open(self.data_dir+item).convert("RGB")
+        for item in img_dirs:   
+            if os.path.isfile(self.image_dir + item):
+                im = io.imread(self.image_dir + item)
                 im = np.array(im)
-                lists.append(im)
-        imgset=np.array(lists)
-        #np.save("imgds.npy",imgset)
+
+                for i in range(1, data_length + 1):
+                    if f'{i}.npy' not in OUTPUT_IMG:
+                        np.save(OUTPUT_IMG + f"/{i}.npy", im)
+        #convert mask to npy
+        msk_dirs = os.listdir(self.mask_dir)
+        msk_dirs.sort()
+        data_length = len(msk_dirs)
+        lists = []
+        for item in msk_dirs:
+            if os.path.isfile(self.mask_dir + item):
+                msk = io.imread(self.mask_dir + item)
+                msk = np.array(msk)
+
+                for i in range(1, data_length + 1):
+                    if f'{i}.npy' not in OUTPUT_MSK:
+                        np.save(OUTPUT_MSK + f"/{i}.npy", msk)
 
     def load_npy(self):
-        loadedimages = []
-        loadedmasks = []
+        images = sorted(glob.glob(self.image_dir + '/*.npy'))
+        masks = sorted(glob.glob(self.mask_dir + '/*.npy'))
 
-        for i in range(len(train_df['id'])):
-            idx = random.randint(0, len(train_df) - 1)
-            img_id = train_df['id'][idx]
-            loadedimages += [np.load(self.data_dir + f'img_npy_512/{img_id}.npy', allow_pickle=True).copy()]
-            loadedmasks += [np.load(self.data_dir + f'mask_npy_512/{img_id}.npy', allow_pickle=True).copy()]
+        imgs_list = []
+        masks_list = []
+        for image, mask in zip(images, masks):
+            imgs_list.append(np.array(np.load(image, allow_pickle=True)))
+            masks_list.append(np.array(np.load(mask, allow_pickle=True)))
 
-        imgs = np.asarray(loadedimages)
-        masks = np.asarray(loadedmasks)
+        imgs_np = np.asarray(imgs_list)
+        masks_np = np.asarray(masks_list)
 
-        return imgs, masks
+        #print(imgs_np.shape, masks_np.shape)
 
-    def train(self):
-        imgs, masks = self.load_npy()
-        x = np.asarray(imgs,dtype=np.float32)/255
-        y = np.asarray(masks,dtype=np.float32)/255
+        x = np.asarray(imgs_np,dtype=np.float32)/255
+        y = np.asarray(masks_np,dtype=np.float32)/255
         y = y.reshape(y.shape[0], y.shape[1], y.shape[2], 1)
 
+        #print(x.shape, y.shape)
+
+        return x, y
+
+    def train(self, x, y):
         from sklearn.model_selection import train_test_split
         x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.145, random_state=0)
 
@@ -103,8 +115,8 @@ class unet_wrapper:
 
         history = model.fit(
         train_gen,
-        steps_per_epoch=1,
-        epochs=1,
+        steps_per_epoch=10,
+        epochs=10,
         
         validation_data=(x_val, y_val),
         callbacks=[callback_checkpoint]
@@ -113,8 +125,7 @@ class unet_wrapper:
         return model, x_val, y_val
 
 
-    def predict(self):
-        model, x_val, y_val = self.train()
+    def predict(self, model, x_val):
         model_filename = 'segm_model_v3.h5'
 
         model.load_weights(model_filename)
@@ -126,8 +137,6 @@ class unet_wrapper:
 
         return a_binary
 
-    def plot_resuts(self):
+    def plot_resuts(self, a_binary, x_val, y_val):
         from keras_unet.utils import plot_imgs
-        a_binary = self.predict()
-        model, x_val, y_val = self.train()
         plot_imgs(org_imgs=x_val, mask_imgs=y_val, pred_imgs=a_binary, nm_img_to_plot=10)
