@@ -2,6 +2,7 @@ import numpy as np
 import glob
 import os
 from skimage import io
+import random
 
 OUTPUT_IMG = "/Users/jiehyun/Jenna/UMassBoston/2022_Fall/CS696/01/output/test_img"
 OUTPUT_MSK = "/Users/jiehyun/Jenna/UMassBoston/2022_Fall/CS696/01/output/test_mask"
@@ -13,33 +14,39 @@ class unet_wrapper:
     
     def convert_to_npy(self):
         #ref: https://gist.github.com/anilsathyan7/ffb35601483ac46bd72790fde55f5c04
-
+        
         #Convert image to npy
         img_dirs = os.listdir(self.image_dir)
         img_dirs.sort()
         data_length = len(img_dirs)
+        i = random.randint(1, data_length + 1)
         lists = []
         for item in img_dirs:   
             if os.path.isfile(self.image_dir + item):
                 im = io.imread(self.image_dir + item)
                 im = np.array(im)
+                lists.append(im)
+        imgset=np.array(lists)
+        
+        for i in range(data_length):
+            if f'{i}.npy' not in OUTPUT_IMG:
+                np.save(OUTPUT_IMG + f"/{i}.npy", imgset[i])
 
-                for i in range(1, data_length + 1):
-                    if f'{i}.npy' not in OUTPUT_IMG:
-                        np.save(OUTPUT_IMG + f"/{i}.npy", im)
         #convert mask to npy
         msk_dirs = os.listdir(self.mask_dir)
         msk_dirs.sort()
-        data_length = len(msk_dirs)
-        lists = []
+        data_length_m = len(msk_dirs)
+        mlists = []
         for item in msk_dirs:
             if os.path.isfile(self.mask_dir + item):
                 msk = io.imread(self.mask_dir + item)
                 msk = np.array(msk)
+                mlists.append(msk)
+        mskset=np.array(mlists)
 
-                for i in range(1, data_length + 1):
-                    if f'{i}.npy' not in OUTPUT_MSK:
-                        np.save(OUTPUT_MSK + f"/{i}.npy", msk)
+        for i in range(data_length_m):
+            if f'{i}.npy' not in OUTPUT_MSK:
+                np.save(OUTPUT_MSK + f"/{i}.npy", mskset[i])
 
     def load_npy(self):
         images = sorted(glob.glob(self.image_dir + '/*.npy'))
@@ -55,6 +62,9 @@ class unet_wrapper:
         masks_np = np.asarray(masks_list)
 
         #print(imgs_np.shape, masks_np.shape)
+
+        from keras_unet.utils import plot_imgs
+        plot_imgs(org_imgs=imgs_np, mask_imgs=masks_np, nm_img_to_plot=3, figsize=5)
 
         x = np.asarray(imgs_np,dtype=np.float32)/255
         y = np.asarray(masks_np,dtype=np.float32)/255
@@ -115,8 +125,8 @@ class unet_wrapper:
 
         history = model.fit(
         train_gen,
-        steps_per_epoch=10,
-        epochs=10,
+        steps_per_epoch=100,
+        epochs=50,
         
         validation_data=(x_val, y_val),
         callbacks=[callback_checkpoint]
